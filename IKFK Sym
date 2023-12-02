@@ -1,0 +1,218 @@
+import maya.cmds as mc
+def guide():
+    global loc,guides,trasforms,types,sides,exval
+    loc=["Shoulder_Guide","Elbow_Guide","Wrist_Guide"]
+    guides = ["Shoulder","Elbow","Wrist"]
+    trasforms = ["translate","rotate","scale"]
+    types = ["IK","FK","Driven"]
+    sides = ["L","R"]
+    #sym = value
+    #stcy= 1
+    
+    
+    for i,a in enumerate(loc):
+        val = [i,0,0]
+        cloc=mc.joint(n=sides[0]+"_"+a,p=val)
+    mc.select(cl=1)
+def build():
+    value=mc.checkBox(sym,q=True,v=True)
+    value1=mc.checkBox(stcy,q=True,v=True)     
+    jGrp=mc.createNode("transform",n="Jnts_Grp")
+    cGrp=mc.createNode("transform",n="Ctrl_Grp")
+    if value==1:
+        
+        mc.select("L_Shoulder_Guide")
+        mc.mirrorJoint(mirrorYZ=True,mirrorBehavior=True,searchReplace=('L_', 'R_') )
+    if value==1:
+        sides=["L","R"]
+    else:
+        sides=["L"]
+    
+    for s,side in enumerate(sides):
+        
+    
+        
+        mc.select(side+"_"+loc[0])
+        mc.FreezeTransformations()
+        mc.select(cl=1)
+        
+        SCtrl=mc.curve(n=side+"_HandIKFKSwitch_Ctrl",d=1 ,p=[(0 ,0, 0 ),( 0 ,0.695462 ,0 ),( -0.0869327 ,0.695462 ,0 ),( -0.0869327, 0.869327 ,0 ),( 0.0869327 ,0.869327, 0 ),( 0.0869327, 0.695462 ,0 ),( 0, 0.695462, 0)], k=[ 0 , 1 , 2 , 3 , 4 , 5 , 6 ])
+        SCtrlGrp=mc.group(n="{}_HandIKFKSwitch_CtrlGrp".format(side))
+        mc.setAttr(side+"_HandIKFKSwitch_Ctrl.overrideEnabled",1)
+        mc.setAttr(side+"_HandIKFKSwitch_Ctrl.overrideColor" ,18)
+        mc.addAttr("{}_HandIKFKSwitch_Ctrl".format(side),longName="IKFK",min=0,max=1,k=True)
+        wpal=mc.xform(side+"_Wrist_Guide",q=True,ws=True,m=True)
+        mc.xform(SCtrlGrp,ws=True,m=wpal)
+        prvJnt = None
+        
+        for t, type in enumerate(types):
+            for g, guide in enumerate(guides):
+            
+                jnt = mc.createNode("joint", name = "{}_{}_{}_Jnt".format(side,guide,type))  #name = (side+"_"+guide+"_"+"type"+"_Jnt")
+                mc.xform(jnt,m = mc.xform("{}_{}_Guide".format(side,guide),q=True,m=True,ws=True),ws=True)
+                if g!=0:
+                    mc.parent(jnt,prvJnt)
+                prvJnt = jnt
+                mc.select(cl=1)
+                mc.select(jnt)
+                mc.FreezeTransformations()
+                mc.select(cl=1)
+        mc.select("{}_Shoulder_IK_Jnt".format(side[0]),"{}_Wrist_IK_Jnt".format(side[0]))
+        ikhan=mc.ikHandle("{}_Shoulder_IK_Jnt".format(side),"{}_Wrist_IK_Jnt".format(side),n="{}_HandIK_Handle".format(side))
+        ikhang=mc.group(n=side+"_IKHandle_Grp")
+        mc.setAttr(ikhang+".visibility",0)
+        for g, guide in enumerate(guides):
+            for tr,trans in enumerate(trasforms):
+                
+                bc = mc.createNode("blendColors", name = "{}_{}_{}_bc".format(side,guide,trans))
+                
+                mc.connectAttr("{}_{}_FK_Jnt.{}".format(side,guide,trans),"{}.color1".format(bc))
+                mc.connectAttr("{}_{}_IK_Jnt.{}".format(side,guide,trans),"{}.color2".format(bc))
+                mc.connectAttr("{}.output".format(bc),"{}_{}_Driven_Jnt.{}".format(side,guide,trans))
+                mc.connectAttr("{}_HandIKFKSwitch_Ctrl.IKFK".format(side),"{}.blender".format(bc))
+                mc.select(cl=1)
+        IkCtrl=mc.curve(n="{}_Hand_Ctrl".format(side),d=1,p=[( 0.5 ,0.5, 0.5 ),( 0.5 ,0.5 ,-0.5 ),( -0.5, 0.5, -0.5 ),( -0.5, -0.5 ,-0.5 ),( 0.5, -0.5, -0.5 ),( 0.5, 0.5 ,-0.5 ),( -0.5, 0.5, -0.5 ),( -0.5, 0.5, 0.5 ),( 0.5 ,0.5, 0.5 ),( 0.5 ,-0.5, 0.5 ),( 0.5, -0.5 ,-0.5 ),( -0.5, -0.5, -0.5 ),( -0.5 ,-0.5, 0.5 ),( 0.5, -0.5, 0.5 ),( -0.5, -0.5, 0.5 ),( -0.5, 0.5, 0.5)], k=[ 0 , 1 , 2 , 3 , 4 , 5 , 6 , 7 , 8 , 9 , 10 , 11 , 12 , 13 , 14 , 15])
+        if value1== 1:
+            mc.addAttr("{}_Hand_Ctrl".format(side),longName="Stretchy",min=0,max=1,k=True)
+            mc.addAttr("{}_Hand_Ctrl".format(side),longName="Upper_Length",dv=1,k=True)
+            mc.addAttr("{}_Hand_Ctrl".format(side),longName="Lower_Length",dv=1,k=True)
+        mc.setAttr(side+"_Hand_Ctrl.overrideEnabled",1)
+        mc.setAttr(side+"_Hand_Ctrl.overrideColor" ,17)
+        IkoffGrp=mc.group(n="{}_Hand_IK_Ctrl_Off".format(side))
+        IkposGrp=mc.group(n="{}_Hand_IK_Ctrl_Pos".format(side))
+        ikval=mc.xform("{}_Wrist_IK_Jnt".format(side),q=True,m=True,ws=True)
+        mc.xform(IkposGrp,ws=True,m=ikval)
+        mc.parent(ikhang,IkCtrl)
+        IkpoCtrl=mc.circle(n="{}_Hand_PoleVector_Ctrl".format(side),r=0.3)
+        IkofGrp=mc.group(n="{}_Hand_PoleVector_Ctrl_off".format(side))
+        IkpposGrp=mc.group(n="{}_Hand_PoleVector_Ctrl_Pos".format(side))
+        ikpoval=mc.xform("{}_Elbow_IK_Jnt".format(side),q=True,t=True,ws=True)
+        mc.xform(IkpposGrp,ws=True,t=ikpoval)
+        mc.setAttr(IkpposGrp+".translateZ",-1)
+        mc.poleVectorConstraint(IkpoCtrl,"{}_HandIK_Handle".format(side))
+        mc.select(cl=1)
+        mc.pointConstraint(side+"_Wrist_Driven_Jnt",SCtrlGrp,mo=1)
+        flprvJnt = None
+    
+        for f, guide in enumerate(guides):
+            fkCtrl=mc.circle(n="{}_{}_FK_Ctrl".format(side,guide),nr=(90,0,0))
+            fkgrpoff=mc.group(n="{}_{}_FK_Off".format(side,guide))
+            fkgrppos=mc.group(n="{}_{}_FK_Pos".format(side,guide))
+            mc.xform(fkgrppos,m = mc.xform("{}_{}_Guide".format(side,guide),q=True,m=True,ws=True),ws=True)
+            mc.parentConstraint(fkCtrl,"{}_{}_FK_Jnt".format(side,guide))
+            if f!=0:
+                mc.parent(fkgrppos,flprvJnt)
+            flprvJnt = fkCtrl
+            
+            #mc.parentConstraint("*_FK_Jnt_Ctrl".format(guides),"*_FK_Jnt".format(guide))
+            mc.select(cl=1)
+        mc.connectAttr("{}_HandIKFKSwitch_Ctrl.IKFK".format(side),"{}_Shoulder_FK_Pos.visibility".format(side))
+        rev=mc.createNode("reverse",n="{}_IKFKSwitch_REV".format(side))
+        mc.connectAttr("{}_HandIKFKSwitch_Ctrl.IKFK".format(side),"{}_IKFKSwitch_REV.inputX".format(side))
+        mc.connectAttr("{}_IKFKSwitch_REV.outputX".format(side),IkposGrp+".visibility".format(side))
+        mc.connectAttr("{}_IKFKSwitch_REV.outputX".format(side),IkpposGrp+".visibility".format(side))
+        mc.parent("{}_Shoulder_IK_Jnt".format(side),"{}_Shoulder_FK_Jnt".format(side),"{}_Shoulder_Driven_Jnt".format(side),"Jnts_Grp")
+        mc.select(cl=1)
+        mc.setAttr("{}_Shoulder_FK_Jnt.visibility".format(side),0)
+        mc.setAttr("{}_Shoulder_IK_Jnt.visibility".format(side),0)
+        mc.delete("{}_Shoulder_Guide".format(side))
+        mc.parent("{}_HandIKFKSwitch_CtrlGrp".format(side),"{}_Hand_IK_Ctrl_Pos".format(side),"{}_Hand_PoleVector_Ctrl_Pos".format(side),"{}_Shoulder_FK_Pos".format(side),"Ctrl_Grp")
+        if value1== 1:
+            
+            gvalte=mc.getAttr("{}_Elbow_IK_Jnt.translateX".format(side))
+            gvaltw=mc.getAttr("{}_Wrist_IK_Jnt.translateX".format(side))
+            mc.select(cl=1)
+            db=mc.createNode("distanceBetween",n="{}_DistanceBetween".format(side))
+            spl=mc.spaceLocator(n="{}_Startpoint_LOC".format(side))
+            epl=mc.spaceLocator(n="{}_Endpoint_LOC".format(side))
+            mc.delete(cmds.parentConstraint("{}_Shoulder_Driven_Jnt".format(side), spl))
+            mc.delete(cmds.parentConstraint("{}_Wrist_Driven_Jnt".format(side), epl))
+            mc.connectAttr("{}_Startpoint_LOCShape.worldPosition[0]".format(side),"{}_DistanceBetween.point1".format(side))
+            mc.connectAttr("{}_Endpoint_LOCShape.worldPosition[0]".format(side),"{}_DistanceBetween.point2".format(side))
+            mc.parentConstraint(IkCtrl,epl,mo=0)
+            md=mc.createNode("multiplyDivide",n="{}_stretchy_MD".format(side))
+            mc.connectAttr(side+"_DistanceBetween.distance",side+"_stretchy_MD.input1X")
+            mc.svalt=mc.setAttr(side+"_stretchy_MD.input2X",gvalte+gvaltw)
+            mc.setAttr(side+"_stretchy_MD.operation",2)
+            mc.createNode("condition",n=side+"_stretchy_CND")
+            mc.setAttr(side+"_stretchy_CND.operation",2)
+            mc.setAttr(side+"_stretchy_CND.secondTerm",1)
+            mc.connectAttr(side+"_stretchy_MD.outputX",side+"_stretchy_CND.colorIfTrueR")
+            mc.connectAttr(side+"_stretchy_MD.outputX",side+"_stretchy_CND.firstTerm")
+            mc.createNode("blendColors",n=side+"_Stretchy_BC")
+            mc.connectAttr(side+"_stretchy_CND.outColorR",side+"_Stretchy_BC.color1R")
+            mc.setAttr(side+"_Stretchy_BC.color2R",1)
+            mc.connectAttr(IkCtrl+".Stretchy",side+"_Stretchy_BC.blender")
+            mc.createNode("multDoubleLinear",n=side+"_Stretchy_MDL")
+            mc.setAttr (side+"_Stretchy_MDL.input2",gvalte)
+            mc.connectAttr (side+"_Stretchy_BC.outputR",side+"_Stretchy_MDL.input1")
+            mc.createNode("multDoubleLinear",n=side+"_StretchyUpperLength_MDL")
+            mc.createNode("multDoubleLinear",n=side+"_StretchyLowerLength_MDL")
+            mc.connectAttr(side+"_Stretchy_MDL.output",side+"_StretchyUpperLength_MDL.input1")
+            mc.connectAttr(side+"_Stretchy_MDL.output",side+"_StretchyLowerLength_MDL.input1")
+            mc.connectAttr(IkCtrl+".Lower_Length",side+"_StretchyLowerLength_MDL.input2")
+            mc.connectAttr(IkCtrl+".Upper_Length",side+"_StretchyUpperLength_MDL.input2")
+            mc.connectAttr(side+"_StretchyLowerLength_MDL.output" ,side+"_Wrist_IK_Jnt.translateX")
+            mc.connectAttr(side+"_StretchyUpperLength_MDL.output" ,side+"_Elbow_IK_Jnt.translateX")
+            mc.pointConstraint(side+"_Shoulder_Driven_Jnt",spl)
+                      
+        else:
+            continue
+            
+    gctrl=mc.curve(n="Global_Ctrl",d=1 ,p=[( -3.992043, 0 ,-3.992043 ),( 3.992043 ,0 ,-3.992043 ),( 3.992043, 0, 3.992043 ),( -3.992043, 0, 3.992043),( -3.992043 ,0, -3.992043)] ,k=[ 0 , 1 , 2 , 3 , 4 ])
+    mc.setAttr("Global_Ctrl.overrideEnabled",1)
+    mc.setAttr("Global_Ctrl.overrideColor" ,18)
+    ggrp=mc.group(n="Global_Ctrl_Grp")
+    rgm=mc.group(n="Rig")
+    un=mc.createNode("transform",n="Untouchable",p=rgm)
+    if value==1:
+        mc.setAttr("R_Hand_IK_Ctrl_Pos.scaleZ",-1)
+        mc.setAttr("R_Hand_IK_Ctrl_Pos.scaleY",-1)
+        mc.setAttr("R_Hand_IK_Ctrl_Pos.scaleX",-1)
+
+    mc.parent(cGrp,gctrl)
+    mc.parent(jGrp,ggrp)
+    mc.parentConstraint(gctrl,jGrp)
+    mc.scaleConstraint(gctrl,jGrp)
+    mc.setAttr(un+".visibility",0)
+    
+    
+
+    
+    #mc.setAttr("*_HandIK_Handle.visibility",0)
+    mc.select(cl=1)
+    
+    if value1==1:
+        mc.parent(epl,un)
+        mc.parent(spl,un)
+        mc.parent("L_Startpoint_LOC",un)
+        mc.parent("L_Endpoint_LOC",un)
+        mc.createNode("multiplyDivide",n="GlobalScale_MD")
+        mc.connectAttr(gctrl+".scaleX","GlobalScale_MD.input1X")
+        exval=mc.getAttr("L_Elbow_IK_Jnt.translateX")
+        wxval=mc.getAttr("L_Wrist_IK_Jnt.translateX")
+        mc.setAttr("GlobalScale_MD.input2X",exval+wxval)
+        mc.connectAttr("GlobalScale_MD.outputX","L_stretchy_MD.input2X")
+        if value==1:
+            mc.connectAttr("GlobalScale_MD.outputX","R_stretchy_MD.input2X")
+
+
+if mc.window("IKFK",exists=True):
+    mc.deleteUI("IKFK",wnd=True)
+#mc.windowPref ("IKFK",r=True)
+mc.window("IKFK",t="Create Arm Setup",wh=(400,180),s=False)
+mc.rowColumnLayout(w=300,h=100,adj=1)
+mc.separator(style='in',h=10)
+mc.text('Priyanshu Mistry',en=0,)
+mc.separator(style='in',h=10)
+mc.button(l='Create Guide',c='guide()',bgc=(.1,.5,.5))
+mc.separator(style='in',h=10)
+sym=mc.checkBox(l="Symmetry")
+mc.separator(style='in',h=10)
+stcy=mc.checkBox(l="Stretchy")
+mc.separator(style='in',h=10)
+mc.button(l='Build',c='build()',bgc=(.5,.7,.6))
+mc.separator(style='in',h=10)
+mc.text('Priyansh2312@gmail.com',en=0,)
+mc.showWindow ("IKFK")
+    
